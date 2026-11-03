@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import sys
 import textwrap
 from io import BytesIO
@@ -721,6 +722,7 @@ def test_host_adapter_rejects_legacy_search_frame_over_ipc(tmp_path: Path) -> No
 
     script = textwrap.dedent(
         f"""
+        import json
         import sys
         from benchmark_harness.external_harnesses.ipc import IpcChannel, IPC_PROTOCOL
 
@@ -735,35 +737,18 @@ def test_host_adapter_rejects_legacy_search_frame_over_ipc(tmp_path: Path) -> No
             }},
             request_id="hello",
         )
-        start = channel.read()
-        channel.send(
-            "audit.event",
-            {{"event_type": "task_started", "network_call_count": 1}},
-            request_id="audit-start",
-        )
-        channel.send(
-            "model.request",
-            {{"messages": [{{"role": "user", "content": "evidence"}}]}},
-            request_id="model-1",
-        )
         channel.read()
-        channel.send("search.request", {{"query": "historical evidence"}}, request_id="search-1")
-        channel.read()
-        channel.send(
-            "audit.event",
-            {{"event_type": "task_finished", "network_call_count": 0}},
-            request_id="audit-finished",
-        )
-        channel.send(
-            "task.result",
-            {{
-                "prediction": "IPC answer",
-                "messages": [{{"role": "user", "content": start.payload["prompt"]}}],
-                "tool_log": [{{"name": "search"}}],
-                "citations": ["https://source.example/pre-cutoff"],
-            }},
-            request_id="task-result",
-        )
+        # Bypass the current encoder: it rejects legacy types before transmission.
+        legacy = {{
+            "schema_version": IPC_PROTOCOL,
+            "type": "search.request",
+            "request_id": "search-1",
+            "task_id": {task_id!r},
+            "seq": 1,
+            "payload": {{"query": "historical evidence"}},
+        }}
+        sys.stdout.write(json.dumps(legacy) + "\\n")
+        sys.stdout.flush()
         """
     )
 
@@ -813,12 +798,20 @@ def test_host_adapter_rejects_legacy_search_frame_over_ipc(tmp_path: Path) -> No
         def open_session(self, **_kwargs: object) -> FakeServiceSession:
             return FakeServiceSession()
 
+    # Keep fixture host pipe reads unbuffered so select() cannot miss a frame
+    # read ahead into Python's buffer.
+    # This test exercises legacy-frame rejection, not buffered pipe scheduling.
+    def unbuffered_process(*args: object, **kwargs: object) -> subprocess.Popen:
+        return subprocess.Popen(*args, **kwargs, bufsize=0)
+
     service = FakeService()
     adapter = FinanceHarnessAdapter(
         FakeManager(),
         search_service=service,  # type: ignore[arg-type]
         worker_command=[sys.executable, "-c", script],
         repo_root=tmp_path,
+        process_factory=unbuffered_process,
+        deep_config=DeepResearchConfig(task_timeout_seconds=5.0),
     )
     profile = ResolvedModelProfile(
         mode="mock",
@@ -841,5 +834,7 @@ def test_host_adapter_rejects_legacy_search_frame_over_ipc(tmp_path: Path) -> No
         model=profile,
         trace_content_mode="hash_only",
     ).for_task(task_id)
-    with pytest.raises(FinanceHarnessBoundaryError, match="IPC peer closed|legacy_search"):
+    with pytest.raises(
+        FinanceHarnessBoundaryError, match="unsupported IPC message type:.*search.request"
+    ):
         adapter.run_deep(task, context)
