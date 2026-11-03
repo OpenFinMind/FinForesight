@@ -3,9 +3,9 @@
 | Task | Machine-readable task ID | Purpose / input variant |
 |---|---|---|
 | VAL | A1 | Valuation scenarios |
-| RANK | A2-F | F input variant (`a2_f`) |
-| RANK | A2-T | T input variant (`a2_t`) |
-| RANK | A2-H | H input variant (`a2_h`) |
+| RANK | A2-F | Fundamental evidence only (`a2_f`) |
+| RANK | A2-T | Precomputed technical indicators only (`a2_t`) |
+| RANK | A2-H | Both fundamental evidence and precomputed technical indicators (`a2_h`) |
 | EVT | B | Event direction |
 | FUND | C | Fundamental forecasts |
 | CF | D | Counterfactual diagnostic |
