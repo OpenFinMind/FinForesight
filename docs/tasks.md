@@ -1,9 +1,17 @@
 # Tasks and temporal populations
 
-VAL/A1 evaluates valuation scenarios; RANK/A2 evaluates rankings with F, T and H
-input variants; EVT/B evaluates event direction; FUND/C evaluates fundamental
-forecasts. CF/D and CALC/E are diagnostic controls. Category and schema identifiers
-remain unchanged in code.
+| Task | Machine-readable task ID | Purpose / input variant |
+|---|---|---|
+| VAL | A1 | Valuation scenarios |
+| RANK | A2-F | F input variant (`a2_f`) |
+| RANK | A2-T | T input variant (`a2_t`) |
+| RANK | A2-H | H input variant (`a2_h`) |
+| EVT | B | Event direction |
+| FUND | C | Fundamental forecasts |
+| CF | D | Counterfactual diagnostic |
+| CALC | E | Calculation diagnostic |
+
+Category and schema identifiers remain unchanged in code and output artifacts.
 
 T1/T2/T3 assignments are analysis-side temporal populations determined by pinned
 cutoff registries, task dates, guard days and settlement state. Keep them separate;

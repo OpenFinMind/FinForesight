@@ -1,11 +1,12 @@
 # Data inputs
 
 The offline example uses only `examples/offline/fixtures.json`, with explicit
-synthetic provenance and A1, A2-F/T/H, B, C, D and E examples (including malformed
+synthetic provenance and VAL, RANK (F/T/H), EVT, FUND, CF and CALC examples (including malformed
 responses). It contains no financial source documents.
 
-The strict and native live example configurations use the existing immutable
-Hub identity `sselaine27/benchmark-research` at
+The canonical Hub dataset is [Yilinss27/benchmark-research](https://huggingface.co/datasets/Yilinss27/benchmark-research). It is gated (auto-approve), licensed CC-BY-4.0: sign in with a HuggingFace account and accept its terms before downloading.
+
+Repository pins and strict/native live configurations retain the legacy Hub identity `sselaine27/benchmark-research` at
 `e941b978af5f8a38fbeb4670ee2d77671a5b551e`, split `train`. Its eight configuration
 names and enforced counts are defined in `benchmark_harness/dataset_sources/`:
 
@@ -19,6 +20,8 @@ names and enforced counts are defined in `benchmark_harness/dataset_sources/`:
 | c | 180 |
 | d | 12 |
 | e | 12 |
+
+HuggingFace redirects the old handle to the canonical namespace with HTTP 307; both refer to the same dataset. The pinned revision above also resolves under the new namespace with the same revision SHA.
 
 These 339 records are a legacy compatibility contract, not the manuscript's final
 1,119-instance release. The v4 template records a separate pin and per-config
