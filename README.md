@@ -1,17 +1,23 @@
 # FinForesight
 
-Research code for **FinForesight: Can Deep Research Systems Truly Forecast Financial Markets?**
+[![Offline release checks](https://github.com/OpenFinMind/FinForesight/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/OpenFinMind/FinForesight/actions/workflows/ci.yml)
+[Paper](https://arxiv.org/abs/2611.01621) · [Dataset](https://huggingface.co/datasets/Yilinss27/benchmark-research)
+
+Research code for **FinForesight: A Diagnostic Backtesting Benchmark for Deep Research Systems in Financial Forecasting**
 FinForesight separates model-visible tasks, mediated research tools, held-out
 labels, and host-side evaluation to study financial forecasting under temporal controls.
 
-| Task | Category | Purpose |
-|---|---|---|
-| VAL | A1 | Valuation forecasts |
-| RANK | A2-F / A2-T / A2-H | Ranking with three input variants |
-| EVT | B | Event direction forecasts |
-| FUND | C | Fundamental value forecasts |
-| CF | D | Counterfactual diagnostic |
-| CALC | E | Calculation diagnostic |
+| Task | Purpose |
+|---|---|
+| VAL | Valuation forecasts |
+| RANK | Ranking with F, T, and H input variants |
+| EVT | Event direction forecasts |
+| FUND | Fundamental value forecasts |
+| CF | Counterfactual diagnostic |
+| CALC | Calculation diagnostic |
+
+Output artifacts retain machine-readable task IDs (A1/A2-F/…); see the
+[task ID mapping](docs/tasks.md).
 
 T1, T2, and T3 remain separate temporal populations; CF and CALC are diagnostic
 controls and do not enter forecasting aggregates. Pending T3 outcomes remain pending.
@@ -53,3 +59,17 @@ See [REPRODUCE.md](REPRODUCE.md), [data](docs/data.md),
 
 Project code retains [Apache-2.0](LICENSE). The frozen evaluator retains its
 CC-BY-4.0 attribution. See [third-party notices](THIRD_PARTY_NOTICES.md).
+
+## Citation
+
+```bibtex
+@misc{liu2026finforesightdiagnosticbacktestingbenchmark,
+      title={FinForesight: A Diagnostic Backtesting Benchmark for Deep Research Systems in Financial Forecasting},
+      author={Fengyuan Liu and Mukai Li and Jieshun You and Yilin Zheng and Chenjia Min and Yizhou Zhang and Harper Chen and Qi Liu},
+      year={2026},
+      eprint={2611.01621},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2611.01621},
+}
+```
