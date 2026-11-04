@@ -36,7 +36,7 @@
   "files": {
     ".env.example": "45901ebd2dd718c3addc2c865e941f7916dcefc25a2e4ace8b2e8e1da42e1c9d",
     ".gitattributes": "835fb2cddf931fa2b2ff7854a629d7c1848f4c2d79e640a1d488177699f237d6",
-    ".github/workflows/ci.yml": "10d02a86ab7e898ec40b55bb1527e31d5ba631d8ac595adb940b976314a2b9a4",
+    ".github/workflows/ci.yml": "120b53d9a42b3baee32c98ea2a4474ee25b1769a1ccbb1810bb99a55376b0c23",
     ".gitignore": "a2586a312452d773bf8212e54f99e04252c5dd9ccd31389a7fca88e5924ac035",
     "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
     "README.md": "9eadc58ff78f9b923e1bb0b45a5771f2194806711d201902ad93f8de2dad079e",
