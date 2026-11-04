@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import errno
 import json
+import os
 import select
 import subprocess
 import time
@@ -535,6 +537,8 @@ class FinanceHarnessAdapter:
             if remaining <= 0:
                 terminate_process_group(process)
                 raise FinanceHarnessBoundaryError("external_worker_timeout")
+            if self._stdout_buffered(process.stdout):
+                return channel.read()
             streams = [process.stdout]
             if process.stderr is not None:
                 streams.append(process.stderr)
@@ -556,6 +560,30 @@ class FinanceHarnessAdapter:
                 return channel.read()
             if process.poll() is not None:
                 raise FinanceHarnessBoundaryError("external_worker_eof")
+
+    @staticmethod
+    def _stdout_buffered(stream: Any) -> bool:
+        peek = getattr(stream, "peek", None)
+        if peek is None or os.name == "nt" or not hasattr(os, "set_blocking"):
+            return False
+        try:
+            fd = stream.fileno()
+            blocking = os.get_blocking(fd)
+        except (OSError, ValueError, AttributeError):
+            return False
+        try:
+            os.set_blocking(fd, False)
+            try:
+                return bool(peek(1))
+            except OSError as exc:
+                if isinstance(exc, BlockingIOError) or exc.errno in {
+                    errno.EAGAIN,
+                    errno.EWOULDBLOCK,
+                }:
+                    return False
+                raise
+        finally:
+            os.set_blocking(fd, blocking)
 
     def _finish_result(
         self,

@@ -56,3 +56,5 @@ inputs are not bundled. `formal-utility/v1` is preserved as an existing analysis
 utility; it is not asserted to equal the manuscript aggregation. In particular,
 its FUND transformation differs from per-instance clipped manuscript utility.
 No command here claims complete paper-table reproduction.
+
+Keep additional verification virtual environments outside the checkout. Before rerunning pytest, remove any in-checkout verification environment: adapter preflight validates the repository root as a source tree and rejects escaping symlinks (the standard `.venv` is exempt).

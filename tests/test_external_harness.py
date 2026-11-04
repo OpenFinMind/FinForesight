@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import textwrap
+import time
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -838,3 +841,142 @@ def test_host_adapter_rejects_legacy_search_frame_over_ipc(tmp_path: Path) -> No
         FinanceHarnessBoundaryError, match="unsupported IPC message type:.*search.request"
     ):
         adapter.run_deep(task, context)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX pipe readiness")
+def test_buffered_ipc_read_ahead_preserves_frames() -> None:
+    script = """
+import json, sys
+from benchmark_harness.external_harnesses.ipc import IPC_PROTOCOL
+frames = [{"schema_version": IPC_PROTOCOL, "type": kind, "request_id": str(i),
+           "task_id": "race", "seq": i, "payload": {"index": i}}
+          for i, kind in enumerate(["audit.event", "model.request"])]
+sys.stdout.write("".join(json.dumps(f) + "\\n" for f in frames))
+sys.stdout.flush()
+sys.stdin.readline()
+"""
+    # One write followed by an explicit parent-side peek guarantees read-ahead,
+    # rather than relying on scheduler timing to coalesce separate writes.
+    with subprocess.Popen(
+        [sys.executable, "-c", script], stdin=subprocess.PIPE, stdout=subprocess.PIPE
+    ) as worker:
+        try:
+            assert worker.stdout is not None and worker.stdin is not None
+            assert worker.stdout.peek(8192).count(b"\n") == 2
+            channel = IpcChannel(worker.stdout, worker.stdin, task_id="race")
+            assert channel.read().payload == {"index": 0}
+            adapter = FinanceHarnessAdapter.__new__(FinanceHarnessAdapter)
+            adapter.deep_config = DeepResearchConfig(task_timeout_seconds=0.2)
+            frame = adapter._read(channel, worker, time.perf_counter())
+            assert (frame.type, frame.seq, frame.payload) == ("model.request", 1, {"index": 1})
+            worker.stdin.write(b"response\n")
+            worker.stdin.flush()
+            assert worker.wait(timeout=2) == 0
+        finally:
+            if worker.poll() is None:
+                worker.kill()
+                worker.wait()
+
+
+def test_silent_worker_deadline_is_bounded() -> None:
+    # The outer process deadline also catches an implementation that blocks
+    # inside peek before it can inspect the adapter's task deadline.
+    script = """
+import subprocess, sys, time
+from benchmark_harness.config import DeepResearchConfig
+from benchmark_harness.external_harnesses.financeharness.adapter import (
+    FinanceHarnessAdapter, FinanceHarnessBoundaryError)
+from benchmark_harness.external_harnesses.ipc import IpcChannel
+worker = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(2)'],
+                          stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+try:
+    adapter = FinanceHarnessAdapter.__new__(FinanceHarnessAdapter)
+    adapter.deep_config = DeepResearchConfig(task_timeout_seconds=0.1)
+    channel = IpcChannel(worker.stdout, worker.stdin, task_id='silent')
+    started = time.perf_counter()
+    try:
+        adapter._read(channel, worker, started)
+    except FinanceHarnessBoundaryError as exc:
+        assert str(exc) == 'external_worker_timeout', str(exc)
+        assert time.perf_counter() - started < 1.0
+        print('bounded timeout')
+    else:
+        raise AssertionError('silent worker unexpectedly returned a frame')
+finally:
+    if worker.poll() is None:
+        worker.kill()
+    worker.wait()
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=3
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "bounded timeout"
+
+
+@pytest.mark.parametrize("blocking", [False, True])
+def test_buffer_probe_restores_fd_state(blocking: bool) -> None:
+    import io
+
+    read_fd, write_fd = os.pipe()
+    with io.BufferedReader(io.FileIO(read_fd, "rb")) as stream:
+        try:
+            os.set_blocking(read_fd, blocking)
+            assert FinanceHarnessAdapter._stdout_buffered(stream) is False
+            assert os.get_blocking(read_fd) is blocking
+            os.write(write_fd, b"frame\n")
+            assert FinanceHarnessAdapter._stdout_buffered(stream) is True
+            assert os.get_blocking(read_fd) is blocking
+            assert stream.readline() == b"frame\n"
+        finally:
+            os.close(write_fd)
+
+
+def test_raw_stream_and_eof_keep_existing_behavior() -> None:
+    from benchmark_harness.external_harnesses.ipc import IpcProtocolError
+
+    assert FinanceHarnessAdapter._stdout_buffered(BytesIO()) is False
+    read_fd, write_fd = os.pipe()
+    os.close(write_fd)
+    with os.fdopen(read_fd, "rb", buffering=0) as stream:
+        assert FinanceHarnessAdapter._stdout_buffered(stream) is False
+        adapter = FinanceHarnessAdapter.__new__(FinanceHarnessAdapter)
+        adapter.deep_config = DeepResearchConfig(task_timeout_seconds=0.2)
+        worker = SimpleNamespace(stdout=stream, stderr=None, poll=lambda: None)
+        channel = IpcChannel(stream, BytesIO(), task_id="eof")
+        with pytest.raises(
+            IpcProtocolError, match="^IPC peer closed stdout before task completion$"
+        ):
+            adapter._read(channel, worker, time.perf_counter())
+
+
+@pytest.mark.parametrize("error_number", [11, 35])
+def test_buffer_probe_would_block_restores_state(error_number: int) -> None:
+    read_fd, write_fd = os.pipe()
+
+    class Stream:
+        def fileno(self) -> int:
+            return read_fd
+
+        def peek(self, _size: int) -> bytes:
+            import errno
+
+            raise BlockingIOError(
+                errno.EAGAIN if error_number == 11 else errno.EWOULDBLOCK, "empty"
+            )
+
+    try:
+        assert FinanceHarnessAdapter._stdout_buffered(Stream()) is False
+        assert os.get_blocking(read_fd) is True
+    finally:
+        os.close(read_fd)
+        os.close(write_fd)
+
+
+def test_buffer_probe_unsupported_platform_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Stream:
+        def peek(self, _size: int) -> bytes:
+            raise AssertionError("peek must not be called without set_blocking")
+
+    monkeypatch.delattr(os, "set_blocking")
+    assert FinanceHarnessAdapter._stdout_buffered(Stream()) is False
