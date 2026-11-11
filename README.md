@@ -1,7 +1,7 @@
 # FinForesight
 
 [![Offline release checks](https://github.com/OpenFinMind/FinForesight/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/OpenFinMind/FinForesight/actions/workflows/ci.yml)
-[Paper](https://arxiv.org/abs/2611.01621) · [Dataset](https://huggingface.co/datasets/Yilinss27/benchmark-research)
+[Paper](https://arxiv.org/abs/2611.01621) · [Dataset](https://huggingface.co/datasets/OpenFinMind/FinForesight)
 
 Research code for **FinForesight: A Diagnostic Backtesting Benchmark for Deep Research Systems in Financial Forecasting**
 FinForesight separates model-visible tasks, mediated research tools, held-out
